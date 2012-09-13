@@ -1,0 +1,3 @@
+*.o
+test_GMM_mpi
+*.bak*
