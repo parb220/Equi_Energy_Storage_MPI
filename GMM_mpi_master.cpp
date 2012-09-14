@@ -17,7 +17,7 @@ using namespace std;
 void *initialize_simulate(void*);
 void *tuning_simulation(void *); 
 bool TuneEnergyLevels_UpdateStorage(CEES_Pthread *, CParameterPackage &); 
-void TuneScale_BurnIn(const CParameterPackage &, const CModel *, CStorageHeadPthread &); 
+void TuneScale_BurnIn(CParameterPackage &, CModel *, CStorageHeadPthread &, const gsl_rng *); 
 
 void usage(int arc, char **argv)
 {
@@ -36,7 +36,7 @@ void usage(int arc, char **argv)
 	cerr << "? this message\n";
 }
 
-void master(int argc, char **argv, const CModel *target, const gsl_rng *r) 
+void master(int argc, char **argv, CModel *target, const gsl_rng *r) 
 {	
 	/* Find out how many processes there are in the default communicator */
 	int nTasks;  
@@ -53,7 +53,6 @@ void master(int argc, char **argv, const CModel *target, const gsl_rng *r)
 	double _c_factor = C; 
 	double _mh_target_acc = MH_TARGET_ACC; 
 	double _energy_level_tuning_max_time = ENERGY_LEVEL_TUNING_MAX_TIME; 
-	int highest_level = NUMBER_ENERGY_LEVEL -1; 
 
 	/* parse command line options */
 	int opt;
@@ -79,13 +78,11 @@ void master(int argc, char **argv, const CModel *target, const gsl_rng *r)
 				_c_factor = atof(optarg); break; 
 			case 't':
 				_energy_level_tuning_max_time = atoi(optarg); break; 
-			case 'e':
-				highest_level = atoi(optarg); break; 
 			case '?':
 			{
 				usage(argc, argv);
 				/* tell all the slaves to exit */ 
-        			for (int rank=1; rank<nTask; rank++)
+        			for (int rank=1; rank<nTasks; rank++)
                 			MPI_Send(0, 0, MPI_INT, rank, -1, MPI_COMM_WORLD);
 				exit(-1); 
 			}
@@ -99,9 +96,14 @@ void master(int argc, char **argv, const CModel *target, const gsl_rng *r)
 		/* When an old session is resumed, then parameter.number_cluster_node read from the parameter file is the number of clusters used in the last simulation. number_cluster_node of this simulation run is nTask */
 		stringstream convert; 
                 convert.str(std::string());
-                convert << _run_id << ".parameter";
+                convert << "/" << _run_id << "/" << _run_id << ".parameter";
                 string file_name = storage_filename_base + convert.str();
                 parameter.LoadParameterFromFile(file_name);
+		
+		convert.str(std::string()); 
+		convert << "/" << _run_id << "/" <<_run_id << ".current_state.0";
+		file_name = storage_filename_base + convert.str(); 
+		parameter.LoadCurrentStateFromFile(file_name); 
         }
 	else 
 	{
@@ -145,7 +147,7 @@ void master(int argc, char **argv, const CModel *target, const gsl_rng *r)
 
 	/* Initialize Storage  */
 	CStorageHeadPthread storage(parameter.run_id, parameter.get_marker, parameter.put_marker, parameter.number_bins,storage_filename_base, 0); 
-	if(if_resume);
+	if(if_resume)
 		storage.restore(); 
 	else 
 		storage.makedir(); 
@@ -154,22 +156,20 @@ void master(int argc, char **argv, const CModel *target, const gsl_rng *r)
 	{
 		// If this is a new simulation, tuning and burning-in is done at master node
 		parameter.number_cluster_node = 1; 
-		TuneScale_BurnIn(parameter, target, storage); 
+		TuneScale_BurnIn(parameter, target, storage, r); 
 		// parameters are saved
-		stringstream conver; 
-		convert.str("");
-		convert << parameter.run_id << ".parameter"; 
+		stringstream convert; 
+		convert.str(string());
+		convert << "/" << parameter.run_id << "/" << parameter.run_id << ".parameter"; 
 		string file_name = storage_filename_base + convert.str(); 
 		parameter.SaveParameterToFile(file_name); 
+
+		convert.str(string()); 
+		convert << "/" << parameter.run_id << "/" << parameter.run_id << ".current_state.0"; 
+		file_name = storage_filename_base + convert.str(); 
+		parameter.SaveCurrentStateToFile(file_name); 
 	}
 
-	// x_current for master node is obtained from parameter
-	CSampleIDWeight *x_current = new CSampleIDWeight [nTasks*parameter.number_energy_level]; 
-	for (int i=0; i<nTasks*parameter.number_energy_level; i++)
-		x_current[i].SetDataDimension(parameter.data_dimension); 
-	for (int i=0; i<parameter.number_energy_level; i++)
-		x_current[i] = parameter.GetCurrentState(i,0); 
-	
 	/* Seed the salves; send out one unit work to each slave*/
 	for (int rank=1; rank<nTasks; rank++)
 		MPI_Send(&parameter.run_id, 1, MPI_INT, rank, parameter.simulation_length, MPI_COMM_WORLD); 
@@ -177,36 +177,32 @@ void master(int argc, char **argv, const CModel *target, const gsl_rng *r)
 	/* receive all results from slaves */
 	// x_current for other nodes are obtained by message passing
 	MPI_Status status;
-	char charBuffer = new char[parameter.numebr_energy_level*x_current[0].GetSize_Data()];
-	stringstream buffer; 
+	int result; 
 	for (int rank=1; rank<nTasks; rank++)
-	{
-		memset(charBuffer, '0', parameter.numebr_energy_level*x_current[0].GetSize_Data());
-		MPI_Recv(charBuffer, parameter.numebr_energy_level*x_current[0].GetSize_Data(), MPI_BYTE, MPI_ANY_RESOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status); 
-		buffer = stringstream(string(charBuffer), stringstream::binary|stringstream::in); 
-		for (int i=0; i<parameter.number_energy_level; i++)
-			read(buffer, &(x_current[rank*number_energy_level+i]));
-	}
+		MPI_Recv(&result, 1, MPI_BYTE, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status); 
 
 	/* tell all the slaves to exit by sending an empty messag with 0 simulation length */
-	for (int rank=1; rank<nTask; rank++)
+	for (int rank=1; rank<nTasks; rank++)
 		MPI_Send(0, 0, MPI_INT, rank, 0, MPI_COMM_WORLD); 
 
-	// save parameters into a text file
+	// save parameters into file
 	parameter.TraceStorageHead(storage);
-	parameter.SetNumberClusterNode(nTasks);  
-	for (int i=0; i<parameter.number_cluster_node; i++)
-		for (int j=0; j<number_energy_level; j++)
-			parameter.SetCurrentState(x[i*number_energy_level+j], j, i); 	
+	parameter.number_cluster_node = nTasks;
+        
 	stringstream convert;
-	convert.str(std::string());
-        convert << parameter.run_id << ".summary";
-        file_name = storage_filename_base + convert.str();
+       	convert.str(string());
+        convert << "/" << parameter.run_id << "/" << parameter.run_id << ".parameter";
+        string file_name = storage_filename_base +  convert.str();
+        parameter.SaveParameterToFile(file_name);
+
+	convert.str(std::string()); 
+	convert << parameter.run_id << ".summary";
+ 	file_name = storage_filename_base + convert.str(); 
         parameter.WriteSummaryFile(file_name);
 }
 
 
-void TuneScale_BurnIn(const CParameterPackage &parameter, const CModel *target, CStorageHeadPthread &storage)
+void TuneScale_BurnIn(CParameterPackage &parameter, CModel *target, CStorageHeadPthread &storage, const gsl_rng *r)
 {
 	/* Initializing CEES_Pthread */ 
 	CEES_Pthread::SetEnergyLevelNumber(parameter.number_energy_level); // Number of energy levels; 
@@ -252,7 +248,7 @@ void TuneScale_BurnIn(const CParameterPackage &parameter, const CModel *target, 
 	
 	/* Pthread */
 	pthread_t *thread = new pthread_t[parameter.number_energy_level];
-	double *temp_buffer_float = new double [parameter.data_dimension]; 
+	temp_buffer_float = new double [parameter.data_dimension]; 
 	cout << "Initialize, burn in, tune/estimate MH stepsize and simulate for " << ENERGY_LEVEL_TRACKING_WINDOW_LENGTH << " steps.\n"; 
 	for (int i=parameter.number_energy_level-1; i>=0; i--)
 	{
@@ -282,11 +278,11 @@ void TuneScale_BurnIn(const CParameterPackage &parameter, const CModel *target, 
 			pthread_join(thread[i], NULL);
 		nEnergyLevelTuning ++;
 	}
-	storage->finalize(); 
+	storage.finalize(); 
 	
 	parameter.TraceStorageHead(storage);
         for (int i=0; i<parameter.number_energy_level; i++)
-                parameter.TraceSimulator(simulator[i],0);
+                parameter.TraceSimulator(simulator[i]);
 	delete [] simulator; 
 	delete [] thread; 
 }

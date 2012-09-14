@@ -7,6 +7,7 @@
 #include <pthread.h>
 #include <mpi.h>
 #include "equi_energy_setup_constant.h"
+#include "CTransitionModel_SimpleGaussian.h"
 #include "CMixtureModel.h"
 #include "CEES_Pthread.h"
 #include "CStorageHeadPthread.h"
@@ -16,8 +17,10 @@ using namespace std;
 
 void *simulation(void*); 
 
-void slave(int argc, char **argv, const CModel *target, const gsl_rng* r)
+void slave(int argc, char **argv, CModel *target, const gsl_rng* r)
 {
+	int my_rank;
+	MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);  
 	int _run_id, _simulation_length, highest_level;  
 	string storage_filename_base;
 	highest_level = -1; 
@@ -49,19 +52,27 @@ void slave(int argc, char **argv, const CModel *target, const gsl_rng* r)
 		CParameterPackage parameter;
 		stringstream convert; 
                 convert.str(std::string());
-                convert << _run_id << ".parameter";
+                convert << "/" << _run_id << "/" << _run_id << ".parameter";
                 string file_name = storage_filename_base + convert.str();
                 parameter.LoadParameterFromFile(file_name);
+		
+		if (my_rank <= parameter.number_cluster_node)	
+		{
+			convert.str(string()); 
+			convert << "/" << _run_id << "/" <<  ".current_state." << my_rank-1;  
+			file_name = storage_filename_base +  convert.str(); 
+			parameter.LoadCurrentStateFromFile(file_name); 
+		}
+
+
 		parameter.simulation_length = _simulation_length; 
 		if (highest_level < 0 || highest_level >= parameter.number_energy_level)
 			highest_level = parameter.number_energy_level-1;
 
-		int my_rank;
-		MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);  
 	
 		/* Initialize Storage  */
 		CStorageHeadPthread storage(parameter.run_id, parameter.get_marker, parameter.put_marker, parameter.number_bins,storage_filename_base, my_rank); 
-		storage.restore(parameter); 
+		storage.restore(); 
 		
 		/* Initializing CEES_Pthread */ 
 		CEES_Pthread::SetEnergyLevelNumber(parameter.number_energy_level); // Number of energy levels; 
@@ -110,11 +121,11 @@ void slave(int argc, char **argv, const CModel *target, const gsl_rng* r)
 		int dim_cum_sum; 
 		for (int i=parameter.number_energy_level-1; i>=0; i--)
 		{
-			if (my_rank >= parameter.number_cluster_node)
+			if (my_rank > parameter.number_cluster_node)
 				simulator[i].Initialize(); 
 			else 
 			{
-				CSampleIDWeight x_start = parameter.GetCurrentState(i, my_rank);
+				CSampleIDWeight x_start = parameter.GetCurrentState(i);
 				simulator[i].Initialize(x_start); 
 			}
 			parameter.GetMHProposalScale(i, temp_buffer_float, parameter.data_dimension); 
@@ -125,6 +136,7 @@ void slave(int argc, char **argv, const CModel *target, const gsl_rng* r)
 				//simulator[i].SetProposal(new CTransitionModel_Gaussian(parameter.GetBlockSize(iBlock), temp_buffer_float+dim_cum_sum), iBlock); 
 				dim_cum_sum += parameter.GetBlockSize(iBlock); 
 			}
+		}
 		delete [] temp_buffer_float;
 
 		// run through simulation
@@ -140,22 +152,21 @@ void slave(int argc, char **argv, const CModel *target, const gsl_rng* r)
 	
 		storage.finalize(); 		// save to hard-disk of those unsaved data
 
-		stringstream buffer(stringstream::binary|stringstream::out); 
-		buffer.str(string()); 
-		CSampleIDWeight x; 
+		parameter.TraceStorageHead(storage); 
 		for (int i=0; i<parameter.number_energy_level; i++)
-		{
-			parameter.TraceSimulator(simulator[i], my_rank); 
-			x = parameter.GetCurrentState(i,my_rank); 
-			write(buffer, &x); 
-		}
-	
+			parameter.TraceSimulator(simulator[i]); 
+		convert.str(string()); 
+		convert << "/" << parameter.run_id << "/" << parameter.run_id << ".current_state." << my_rank-1; 
+		file_name = storage_filename_base + convert.str(); 
+		parameter.SaveCurrentStateToFile(file_name); 
+		
+		int result = 1; 
+		/* Send info back */
+		MPI_Send(&result, 1, MPI_INT, 0, 0, MPI_COMM_WORLD); 
+		
 		/* Release dynamically allocated space */
 		delete [] thread; 
 		delete [] simulator; 
-		
-		/* Send info back */
-		MPI_Send(buffer.str().c_str(), x.GetSize_Data()*parameter.number_energy_level, MPI_BYTE, 0, 0, MPI_COMM_WORLD); 
 	}
 }
 

@@ -22,16 +22,17 @@
 #include <gsl/gsl_rng.h>
 #include <mpi.h>
 #include "CMixtureModel.h"
+#include "CSimpleGaussianModel.h"
 
 using namespace std;
 
 bool Configure_GaussianMixtureModel_File(CMixtureModel &, const string); 
-void master(int, char **argv, const CModel *, const gsl_rng *); 
-void slave(int, char**argv, const CModel *, const gsl_rng *); 
+void master(int, char **argv, CModel *, const gsl_rng *); 
+void slave(int, char**argv, CModel *, const gsl_rng *); 
 
 int main(int argc, char ** argv)
 {
-	int myrank;
+	int my_rank;
  
 	/* Initialize MPI */
 	MPI_Init(&argc, &argv); 
@@ -68,7 +69,7 @@ int main(int argc, char ** argv)
 	}
 
 	MPI_Comm_rank(MPI_COMM_WORLD, &my_rank); 
-	if (myrank == 0)
+	if (my_rank == 0)
 		master(argc, argv, &target, r); 
 	else 
 		slave(argc, argv, &target, r); 
