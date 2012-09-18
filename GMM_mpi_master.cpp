@@ -38,7 +38,7 @@ void master(string storage_filename_base, CStorageHeadPthread &storage, CParamet
 		
 		// Write parameters 
 		convert.str(string());
-		convert << parameter.run_id << ".parameter"; 
+		convert << parameter.run_id << "/" << parameter.run_id << ".parameter"; 
 		file_name = storage_filename_base + convert.str(); 
 		parameter.SaveParameterToFile(file_name); 
 	}
@@ -64,18 +64,18 @@ void master(string storage_filename_base, CStorageHeadPthread &storage, CParamet
 	parameter.TraceStorageHead(storage);
         
        	convert.str(string());
-        convert <<  parameter.run_id << ".parameter";
+        convert <<  parameter.run_id << "/" << parameter.run_id << ".parameter";
         file_name = storage_filename_base +  convert.str();
         parameter.SaveParameterToFile(file_name);
 
 	convert.str(string()); 
-	convert << parameter.run_id << ".summary";
+	convert << parameter.run_id << "/" << parameter.run_id << ".summary";
  	file_name = storage_filename_base + convert.str(); 
         parameter.WriteSummaryFile(file_name);
 	
 	// Write current state
 	convert.str(string());
-        convert << parameter.run_id << ".current_state." << my_rank;
+        convert << parameter.run_id << "/" << parameter.run_id << ".current_state." << my_rank;
         file_name = storage_filename_base + convert.str();
         parameter.SaveCurrentStateToFile(file_name);
 }

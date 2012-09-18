@@ -36,7 +36,7 @@ void slave(string storage_filename_base, CStorageHeadPthread &storage, CParamete
 		parameter.TraceStorageHead(storage); 
 		stringstream convert; 
 		convert.str(string()); 
-		convert << parameter.run_id << ".current_state." << my_rank; 
+		convert << parameter.run_id << "/" << parameter.run_id << ".current_state." << my_rank; 
 		string file_name = storage_filename_base + convert.str(); 
 		parameter.SaveCurrentStateToFile(file_name); 
 		

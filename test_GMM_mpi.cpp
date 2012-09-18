@@ -122,7 +122,7 @@ int main(int argc, char ** argv)
         if (if_resume)
         {
                 convert.str(std::string());
-                convert <<  _run_id  << ".parameter";
+                convert <<  _run_id  << "/" << _run_id << ".parameter";
                 file_name = storage_filename_base + convert.str();
                 parameter.LoadParameterFromFile(file_name);
         }
@@ -184,7 +184,7 @@ int main(int argc, char ** argv)
 	if (if_resume)
 	{
 		convert.str(string()); 
-		convert << _run_id << ".current_state." << my_rank; 
+		convert << _run_id << "/" << _run_id << ".current_state." << my_rank; 
 		file_name = storage_filename_base + convert.str(); 
 		if (!parameter.LoadCurrentStateFromFile(file_name) && !parameter.LoadCurrentStateFromStorage(storage, r))
 			parameter.SetCurrentState(r); 
