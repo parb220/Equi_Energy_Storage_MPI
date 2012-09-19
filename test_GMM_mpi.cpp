@@ -162,7 +162,7 @@ int main(int argc, char ** argv)
                 parameter.SetMHProposalScale();
 	}
 	parameter.simulation_length = _simulation_length; 
-	if (!if_resume || highest_level <0 || highest_level >= parameter.number_energy_level-1)
+	if (!if_resume || highest_level <0 || highest_level >= parameter.number_energy_level)
 		highest_level = parameter.number_energy_level-1;
 	
 	/* Initialize the target distribution as a Gaussian mixture model; */
@@ -184,7 +184,7 @@ int main(int argc, char ** argv)
 	if (if_resume)
 	{
 		convert.str(string()); 
-		convert << _run_id << "/" << _run_id << ".current_state." << my_rank; 
+		convert << parameter.run_id << "/" << parameter.run_id << ".current_state." << my_rank; 
 		file_name = storage_filename_base + convert.str(); 
 		if (!parameter.LoadCurrentStateFromFile(file_name) && !parameter.LoadCurrentStateFromStorage(storage, r))
 			parameter.SetCurrentState(r); 
