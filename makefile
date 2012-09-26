@@ -18,7 +18,7 @@ MULTI_CORE_VERSION_OBJS = $(MULTI_CORE_VERSION_DIR)/CEES_Pthread.o $(MULTI_CORE_
 
 all:  test_GMM_mpi
 
-test_GMM_mpi_obj = test_GMM_mpi.o GMM_mpi_master.o GMM_mpi_slave.o $(MULTI_CORE_VERSION_OBJS) $(SINGLE_CORE_VERSION_OBJS) $(DISTR_MODEL_OBJS)
+test_GMM_mpi_obj = test_GMM_mpi.o mpi_master.o mpi_slave.o TuneScale_BurnIn.o RunSimulation.o $(MULTI_CORE_VERSION_OBJS) $(SINGLE_CORE_VERSION_OBJS) $(DISTR_MODEL_OBJS)
 
 test_GMM_mpi: $(test_GMM_mpi_obj)
 	$(MPICXX) $(CFLAGS) $(LIBS_DIR) $(LIBS) $(test_GMM_mpi_obj) -o test_GMM_mpi 
@@ -26,11 +26,17 @@ test_GMM_mpi: $(test_GMM_mpi_obj)
 test_GMM_mpi.o: test_GMM_mpi.cpp
 	$(MPICXX) $(CFLAGS) $(INCLUDE_DIR) -c test_GMM_mpi.cpp 
 
-GMM_mpi_master.o: GMM_mpi_master.cpp
-	$(MPICXX) $(CFLAGS) $(INCLUDE_DIR) -c GMM_mpi_master.cpp
+mpi_master.o: mpi_master.cpp
+	$(MPICXX) $(CFLAGS) $(INCLUDE_DIR) -c mpi_master.cpp
 
-GMM_mpi_slave.o: GMM_mpi_slave.cpp
-	$(MPICXX) $(CFLAGS) $(INCLUDE_DIR) -c GMM_mpi_slave.cpp
+mpi_slave.o: mpi_slave.cpp
+	$(MPICXX) $(CFLAGS) $(INCLUDE_DIR) -c mpi_slave.cpp
+
+TuneScale_BurnIn.o: TuneScale_BurnIn.cpp
+	$(MPICXX) $(CFLAGS) $(INCLUDE_DIR) -c TuneScale_BurnIn.cpp
+
+RunSimulation.o: RunSimulation.cpp
+	$(MPICXX) $(CFLAGS) $(INCLUDE_DIR) -c RunSimulation.cpp
 
 clean: 
 	rm -f *.o  test_GMM_mpi 

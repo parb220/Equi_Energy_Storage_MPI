@@ -14,37 +14,7 @@
 
 using namespace std;
 
-void *simulation(void*); 
-void RunSimulation(CParameterPackage &, int, int, CModel *, CStorageHeadPthread &, const gsl_rng *); 
-
-void slave(string storage_filename_base, CStorageHeadPthread &storage, CParameterPackage &parameter, int highest_level, bool if_resume, CModel *target, const gsl_rng* r)
-{
-	int my_rank;
-	MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);  
-	MPI_Status status; 
-	int start; 
-	while (1)
-	{
-		MPI_Recv(&start, 1, MPI_INT, 0, MPI_ANY_TAG, MPI_COMM_WORLD, &status); 
-		if (status.MPI_TAG == 0)
-			return; 
-		else if (status.MPI_TAG < 0)
-			exit(-1);
-
-		RunSimulation(parameter, highest_level, my_rank, target, storage, r); 
-	
-		parameter.TraceStorageHead(storage); 
-		stringstream convert; 
-		convert.str(string()); 
-		convert << parameter.run_id << "/" << parameter.run_id << ".current_state." << my_rank; 
-		string file_name = storage_filename_base + convert.str(); 
-		parameter.SaveCurrentStateToFile(file_name); 
-		
-		int result = 1; 
-		/* Send info back */
-		MPI_Send(&result, 1, MPI_INT, 0, 0, MPI_COMM_WORLD); 
-	}
-}
+void *simulation(void*);
 
 void RunSimulation(CParameterPackage &parameter, int highest_level, int my_rank, CModel *target, CStorageHeadPthread &storage, const gsl_rng *r)
 {	
@@ -52,7 +22,7 @@ void RunSimulation(CParameterPackage &parameter, int highest_level, int my_rank,
 	CEES_Pthread::SetEnergyLevelNumber(parameter.number_energy_level); // Number of energy levels; 
 	CEES_Pthread::SetEquiEnergyJumpProb(parameter.pee);		// Probability for equal energy jump
 	CEES_Pthread::SetDataDimension(parameter.data_dimension); 	// Data dimension for simulation
-	CEES_Pthread::ultimate_target = target;	
+	// CEES_Pthread::ultimate_target = target;	
 
 	double *temp_buffer_float=new double[parameter.number_energy_level]; 
 	// Energy bound 
@@ -78,6 +48,7 @@ void RunSimulation(CParameterPackage &parameter, int highest_level, int my_rank,
 	CEES_Pthread *simulator = new CEES_Pthread[parameter.number_energy_level]; 
 	for (int i=0; i<parameter.number_energy_level; i++)
 	{
+		simulator[i].ultimate_target = &(target[i]); 
 		simulator[i].SetID_LocalTarget(i);
 		simulator[i].r = r; 	// random number generator  
 		if (i < parameter.number_energy_level-1)
