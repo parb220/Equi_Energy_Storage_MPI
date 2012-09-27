@@ -22,9 +22,9 @@ void RunSimulation(CParameterPackage &, int, int, CModel**, CStorageHeadPthread 
 void master(string storage_filename_base, CStorageHeadPthread &storage, CParameterPackage &parameter, int highest_level, bool if_resume, CModel **target, const gsl_rng *r) 
 {	
 	/* Find out how many processes there are in the default communicator */
-	int nTasks=1, my_rank=0;   
-	/*MPI_Comm_size(MPI_COMM_WORLD, &nTasks); 
-	MPI_Comm_rank(MPI_COMM_WORLD, &my_rank); */
+	int nTasks, my_rank;   
+	MPI_Comm_size(MPI_COMM_WORLD, &nTasks); 
+	MPI_Comm_rank(MPI_COMM_WORLD, &my_rank); 
 
 	stringstream convert; 
 	string file_name; 
@@ -43,22 +43,23 @@ void master(string storage_filename_base, CStorageHeadPthread &storage, CParamet
 		parameter.SaveParameterToFile(file_name); 
 	}
 
-	/* Seed the salves; send out one unit work to each slave 
+	/* Seed the salves; send out one unit work to each slave */
 	int start; 
 	for (int rank=1; rank<nTasks; rank++)
-		MPI_Send(&start, 1, MPI_INT, rank, 1 , MPI_COMM_WORLD);*/
+		MPI_Send(&start, 1, MPI_INT, rank, 1 , MPI_COMM_WORLD);
 	
 	// Run task on master
 	RunSimulation(parameter, highest_level, 0, target, storage, r); 
 	
-	/* receive all results from slaves 
+	/* receive all results from slaves */
 	MPI_Status status;
 	int result; 
 	for (int rank=1; rank<nTasks; rank++)
-		MPI_Recv(&result, 1, MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);*/
-	/* tell all the slaves to exit by sending an empty messag with 0 simulation length 
+		MPI_Recv(&result, 1, MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+
+	// tell all the slaves to exit by sending an empty messag with 0 simulation length 
 	for (int rank=1; rank<nTasks; rank++)
-		MPI_Send(0, 0, MPI_INT, rank, 0, MPI_COMM_WORLD);*/
+		MPI_Send(0, 0, MPI_INT, rank, 0, MPI_COMM_WORLD);
 
 	parameter.number_cluster_node = nTasks;
 	parameter.TraceStorageHead(storage);
