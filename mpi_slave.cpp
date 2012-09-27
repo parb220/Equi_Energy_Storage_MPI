@@ -15,9 +15,9 @@
 using namespace std;
 
 void *simulation(void*); 
-void RunSimulation(CParameterPackage &, int, int, CModel **, CStorageHeadPthread &, const gsl_rng *); 
+void RunSimulation(CParameterPackage &, int, int, CModel *, CStorageHeadPthread &, const gsl_rng *); 
 
-void slave(string storage_filename_base, CStorageHeadPthread &storage, CParameterPackage &parameter, int highest_level, bool if_resume, CModel **target, const gsl_rng* r)
+void slave(string storage_filename_base, CStorageHeadPthread &storage, CParameterPackage &parameter, int highest_level, bool if_resume, CModel *target, const gsl_rng* r)
 {
 	int my_rank;
 	MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);  

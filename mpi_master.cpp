@@ -16,10 +16,10 @@ using namespace std;
 void *initialize_simulate(void*);
 void *tuning_simulation(void *); 
 bool TuneEnergyLevels_UpdateStorage(CEES_Pthread *, CParameterPackage &); 
-void TuneScale_BurnIn(CParameterPackage &, CModel **, CStorageHeadPthread &, const gsl_rng *); 
-void RunSimulation(CParameterPackage &, int, int, CModel**, CStorageHeadPthread &, const gsl_rng *); 
+void TuneScale_BurnIn(CParameterPackage &, CModel *, CStorageHeadPthread &, const gsl_rng *); 
+void RunSimulation(CParameterPackage &, int, int, CModel*, CStorageHeadPthread &, const gsl_rng *); 
 
-void master(string storage_filename_base, CStorageHeadPthread &storage, CParameterPackage &parameter, int highest_level, bool if_resume, CModel **target, const gsl_rng *r) 
+void master(string storage_filename_base, CStorageHeadPthread &storage, CParameterPackage &parameter, int highest_level, bool if_resume, CModel *target, const gsl_rng *r) 
 {	
 	/* Find out how many processes there are in the default communicator */
 	int nTasks, my_rank;   
