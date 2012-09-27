@@ -18,7 +18,7 @@ void *tuning_simulation(void *);
 bool TuneEnergyLevels_UpdateStorage(CEES_Pthread *, CParameterPackage &); 
 void RunSimulation(CParameterPackage &, int, int, CModel*, CStorageHeadPthread &, const gsl_rng *); 
 
-void TuneScale_BurnIn(CParameterPackage &parameter, CModel *target, CStorageHeadPthread &storage, const gsl_rng *r)
+void TuneScale_BurnIn(CParameterPackage &parameter, CModel **target, CStorageHeadPthread &storage, const gsl_rng *r)
 {
 	/* Initializing CEES_Pthread */ 
 	CEES_Pthread::SetEnergyLevelNumber(parameter.number_energy_level); // Number of energy levels; 
@@ -49,7 +49,7 @@ void TuneScale_BurnIn(CParameterPackage &parameter, CModel *target, CStorageHead
 	CEES_Pthread *simulator = new CEES_Pthread[parameter.number_energy_level]; 
 	for (int i=0; i<parameter.number_energy_level; i++)
 	{
-		simulator[i].ultimate_target = &(target[i]);
+		simulator[i].ultimate_target = target[i];
 		simulator[i].SetID_LocalTarget(i);
 		simulator[i].r = r; 	// random number generator  
 		if (i < parameter.number_energy_level-1)

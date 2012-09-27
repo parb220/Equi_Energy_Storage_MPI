@@ -31,8 +31,8 @@
 using namespace std;
 
 bool Configure_GaussianMixtureModel_File(CMixtureModel &, const string); 
-void master(string, CStorageHeadPthread &, CParameterPackage &, int, bool, CModel *, const gsl_rng *); 
-void slave(string, CStorageHeadPthread &, CParameterPackage &, int, bool, CModel *, const gsl_rng *); 
+void master(string, CStorageHeadPthread &, CParameterPackage &, int, bool, CModel **, const gsl_rng *); 
+void slave(string, CStorageHeadPthread &, CParameterPackage &, int, bool, CModel **, const gsl_rng *); 
 
 void usage(int arc, char **argv)
 {
@@ -167,12 +167,17 @@ int main(int argc, char ** argv)
 	
 	/* Initialize the target distribution as a Gaussian mixture model; */
 	// Mean Sigma and Weight are stored in files
-	CMixtureModel target; 
-	if (!Configure_GaussianMixtureModel_File(target, target_filename_base))
+	CMixtureModel ultimate_target; 
+	if (!Configure_GaussianMixtureModel_File(ultimate_target, target_filename_base))
 	{
 		cerr << "Error in configuring gaussian mixture model as the target model.\n"; 
 		exit (-1);
 	}
+	CModel **target = new CModel *[parameter.number_energy_level]; 
+	for (int i=0; i<parameter.number_energy_level; i++)
+		target[i] = &ultimate_target;  
+
+
 	// Storage
 	CStorageHeadPthread storage(parameter.run_id, parameter.get_marker, parameter.put_marker, parameter.number_bins,storage_filename_base, my_rank);
 	if (if_resume)
@@ -195,9 +200,9 @@ int main(int argc, char ** argv)
 	// master runs burn-in and tuning and simulation 
 	// slave runs simulation
 	if (my_rank == 0)
-		master(storage_filename_base, storage, parameter, highest_level, if_resume, &target, r); 
+		master(storage_filename_base, storage, parameter, highest_level, if_resume, target, r); 
 	else 
-		slave(storage_filename_base, storage, parameter, highest_level, if_resume, &target, r); 
+		slave(storage_filename_base, storage, parameter, highest_level, if_resume, target, r); 
 
 	gsl_rng_free(r);	
 	/* Shut down MPI */
