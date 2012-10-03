@@ -95,6 +95,7 @@ void TuneScale_BurnIn(CParameterPackage &parameter, CModel *target, CStorageHead
 			pthread_join(thread[i], NULL);
 		nEnergyLevelTuning ++;
 	}
+	storage.DisregardHistorySamples(); 
 	
         for (int i=0; i<parameter.number_energy_level; i++)
                 parameter.TraceSimulator(simulator[i]);
